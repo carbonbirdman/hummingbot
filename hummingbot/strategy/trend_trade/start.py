@@ -13,6 +13,7 @@ def start(self):
         spread = trend_trade_config_map.get("spread").value
         order_amount = trend_trade_config_map.get("order_amount").value
         price_type = trend_trade_config_map.get("price_type").value.lower()
+        tick_length = trend_trade_config_map.get("tick_length").value
 
         if price_type == "mid_price":
             price_type = PriceType.MidPrice
@@ -33,6 +34,7 @@ def start(self):
             spread=spread,
             order_amount=order_amount,
             price_type=price_type,
+            tick_length = tick_length,
             hb_app_notification=True,
         )
     except Exception as e:

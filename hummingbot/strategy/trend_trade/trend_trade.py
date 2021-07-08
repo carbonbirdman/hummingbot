@@ -46,6 +46,7 @@ class TrendTradeStrategy(StrategyPyBase):
                  spread: Decimal,
                  order_amount: Decimal,
                  price_type: PriceType,
+                 tick_length: Decimal,
                  hb_app_notification: bool = False,
                  ):
 
@@ -56,6 +57,7 @@ class TrendTradeStrategy(StrategyPyBase):
         self._spread = spread / Decimal("100")
         self._order_amount = order_amount
         self._price_type = price_type
+        self._tick_length = tick_length
         self._hb_app_notification = hb_app_notification
 
         self.add_markets([self._exchange])
@@ -222,10 +224,10 @@ class TrendTradeStrategy(StrategyPyBase):
 
             self._cancel_active_order()
             self.get_trend()
-            if self.trend:
+            if self._trend:
                 self.logger().info(f"We are trending {self._trend}. Order placed.")
                 self._place_order(price=new_price)
             else:
-                self.logger().info(f"We are not trending. Mean is {self._mean}. No order placed.")
+                self.logger().info(f"We are not trending. Price is {new_price} Mean is {self._mean}. No order placed.")
 
             self._current_price = new_price

@@ -118,7 +118,9 @@ class StartCommand:
         try:
             config_path: str = self.strategy_file_name
             self.start_time = time.time() * 1e3  # Time in milliseconds
-            self.clock = Clock(ClockMode.REALTIME)
+            tick_interval = 6.0
+            self._notify(f"Clock ticks every {tick_interval}")
+            self.clock = Clock(ClockMode.REALTIME, tick_interval)
             if self.wallet is not None:
                 self.clock.add_iterator(self.wallet)
             for market in self.markets.values():

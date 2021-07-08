@@ -24,5 +24,8 @@ order_amount: null
 # Specify mid_price/last_price/last_own_trade_price
 price_type: null
 
+# Tick frequency
+tick_length: 6.0
+
 # For more detailed information, see:
 # https://docs.hummingbot.io/strategies/simple-trade/#configuration-parameters

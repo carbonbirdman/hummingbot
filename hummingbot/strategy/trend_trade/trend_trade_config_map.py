@@ -121,4 +121,13 @@ trend_trade_config_map = {
                   else "Invalid price type.",
                   prompt_on_new=True,
                   ),
+
+    "tick_length":
+        ConfigVar(key="tick_length",
+                  prompt="tick length",
+                  type_str="decimal",
+                  default="1.0",
+                  validator=lambda v: validate_decimal(v, 1, 3600, inclusive=False),
+                  prompt_on_new=True,
+                  ),
 }

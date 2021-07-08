@@ -81,9 +81,12 @@ def main():
         "hummingbot.strategy",
         "hummingbot.strategy.amm_arb",
         "hummingbot.strategy.arbitrage",
+        "hummingbot.strategy.conditional_trade",
+        "hummingbot.strategy.dev_0_hello_world",
         "hummingbot.strategy.cross_exchange_market_making",
         "hummingbot.strategy.pure_market_making",
         "hummingbot.strategy.perpetual_market_making",
+        "hummingbot.strategy.indicator_perps",
         "hummingbot.strategy.avellaneda_market_making",
         "hummingbot.strategy.__utils__",
         "hummingbot.strategy.__utils__.trailing_indicators",
@@ -109,6 +112,7 @@ def main():
         "aiokafka",
         "attrdict",
         "cytoolz",
+        "ccxt",
         "eth-abi",
         "eth-account",
         "eth-bloom",
@@ -167,7 +171,7 @@ def main():
     if "DEV_MODE" in os.environ:
         version += ".dev1"
         package_data[""] = [
-            "*.pxd", "*.pyx", "*.h"
+            "*.pxd", "*.pyx", "*.h", "*.py"
         ]
         package_data["hummingbot"].append("core/cpp/*.cpp")
 
@@ -184,6 +188,7 @@ def main():
           packages=packages,
           package_data=package_data,
           install_requires=install_requires,
+          py_modules=["hummingbot/**/*.py"],
           ext_modules=cythonize(["hummingbot/**/*.pyx"], compiler_directives=compiler_directives, **cython_kwargs),
           include_dirs=[
               np.get_include()

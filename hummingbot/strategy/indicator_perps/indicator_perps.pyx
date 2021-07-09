@@ -35,8 +35,8 @@ from .data_types import (
     Proposal,
     PriceSize
 )
-from .perpetual_market_making_order_tracker import PerpetualMarketMakingOrderTracker
 
+from hummingbot.strategy.perpetual_market_making.perpetual_market_making_order_tracker import PerpetualMarketMakingOrderTracker
 from hummingbot.strategy.perpetual_market_making.asset_price_delegate cimport AssetPriceDelegate
 from hummingbot.strategy.perpetual_market_making.asset_price_delegate import AssetPriceDelegate
 from hummingbot.strategy.perpetual_market_making.order_book_asset_price_delegate cimport OrderBookAssetPriceDelegate

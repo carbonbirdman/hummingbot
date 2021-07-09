@@ -4,12 +4,12 @@ from typing import (
 )
 
 from hummingbot.strategy.market_trading_pair_tuple import MarketTradingPairTuple
+from hummingbot.strategy.indicator_perps import IndicatorPerpsStrategy
 from hummingbot.strategy.perpetual_market_making import (
-    PerpetualMarketMakingStrategy,
     OrderBookAssetPriceDelegate,
     APIAssetPriceDelegate
 )
-from hummingbot.strategy.perpetual_market_making.perpetual_market_making_config_map import perpetual_market_making_config_map as c_map
+from hummingbot.strategy.indicator_perps.indicator_perps_config_map import indicator_perps_config_map as c_map
 from hummingbot.connector.exchange.paper_trade import create_paper_trade_market
 from hummingbot.connector.exchange_base import ExchangeBase
 from decimal import Decimal
@@ -72,9 +72,9 @@ def start(self):
             asset_price_delegate = APIAssetPriceDelegate(price_source_custom_api)
         take_if_crossed = c_map.get("take_if_crossed").value
 
-        strategy_logging_options = PerpetualMarketMakingStrategy.OPTION_LOG_ALL
+        strategy_logging_options = IndicatorPerpsStrategy.OPTION_LOG_ALL
 
-        self.strategy = PerpetualMarketMakingStrategy(
+        self.strategy = IndicatorPerpsStrategy(
             market_info=MarketTradingPairTuple(*maker_data),
             leverage=leverage,
             position_mode=position_mode,

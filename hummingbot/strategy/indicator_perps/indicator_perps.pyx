@@ -2,6 +2,8 @@ from decimal import Decimal
 import logging
 import pandas as pd
 import numpy as np
+import ccxt
+
 from typing import (
     List,
     Dict,
@@ -161,6 +163,10 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         self._exit_orders = []
         self._next_buy_exit_order_timestamp = 0
         self._next_sell_exit_order_timestamp = 0
+        self._mean1h: float = 0.0
+        self._trend1h: bool = False
+        self._mean10m: float = 0.0
+        self._trend10m: bool = False
 
         self.c_add_markets([market_info.market])
 
@@ -539,8 +545,37 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         return self.c_cancel_order(self._market_info, order_id)
 
     # ---------------------------------------------------------------
+    def update_indicator_signals(self):
+        """ Get the last nsteps of timeframe data and average it. """
+        try:
+            exchange = ccxt.ftx()
+            coin = "BTC/USD"
+            timeframe = '1m'
+            nsteps = 10
+            tsi = exchange.fetch_ohlcv(coin, timeframe, limit=nsteps)
+            tspd = pd.DataFrame(tsi, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
+            self._mean10m = tspd['close'].mean()
+            self._trend10m = tspd['close'].iloc[-1] > self._mean10m
+            if self._trend10m:
+                self._buy_signal = True
+                self._sell_signal = False
+            else:
+                self._buy_signal = False
+                self._sell_signal = True
+        except Exception e:
+            self.logger().warning(f"No data. Hold up.{e}")
+            self._buy_signal = False
+            self._sell_signal = False
+        #
+        # timeframe = '5m'
+        # nsteps = 20
+        # tsi = exchange.fetch_ohlcv(coin, timeframe, limit=nsteps)
+        # tspd = pd.DataFrame(tsi, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
+        # self._mean1h = tspd['close'].mean()
+        # self._trend1h = tspd['close'].iloc[-1] > self._mean1h
 
     cdef c_start(self, Clock clock, double timestamp):
+        clock._tick_size = 2
         StrategyBase.c_start(self, clock, timestamp)
         self._last_timestamp = timestamp
         self.c_apply_initial_settings(self.trading_pair, self._position_mode, self._leverage)
@@ -553,6 +588,10 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
 
     cdef c_tick(self, double timestamp):
         StrategyBase.c_tick(self, timestamp)
+
+        self.update_indicator_signals()
+        # self.logger().info(f"Trend 10m {self._trend10m}. Mean {self._mean10m}. Sell: {self._sell_signal}. Buy: {self._buy_signal}")
+
         cdef:
             ExchangeBase market = self._market_info.market
             list session_positions = [s for s in self.active_positions.values() if s.trading_pair == self.trading_pair]
@@ -591,6 +630,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                     self.c_apply_order_price_modifiers(proposal)
                     # 4. Apply budget constraint, i.e. can't buy/sell more than what you have.
                     self.c_apply_budget_constraint(proposal)
+                    self.c_apply_indicator_constraint(proposal)
 
                     if not self._take_if_crossed:
                         self.c_filter_out_takers(proposal)
@@ -879,6 +919,19 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                 [f"  Ping-pong removed {self._filled_sells_balance} sell orders."]
             )
 
+    cdef c_apply_indicator_constraint(self, object proposal):
+        """ Only longs in an uptrend
+            Only shorts in a downtrend
+        """
+        self.update_indicator_signals()
+        # self._trend1h: bool = False
+        if self._buy_signal:
+            self.logger().info(f"Buy signal. No selling.")
+            proposal.sells = []
+        elif self._sell_signal:
+            self.logger().info(f"Sell signal. No buying.")
+            proposal.buys = []
+
     cdef c_apply_order_price_modifiers(self, object proposal):
         if self._order_optimization_enabled:
             self.c_apply_order_optimization(proposal)
@@ -1150,6 +1203,26 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                                f"and current order prices is within "
                                f"{self._order_refresh_tolerance_pct:.2%} order_refresh_tolerance_pct")
             self.set_timers()
+
+    # Cancel if our indicators say to
+    cdef c_cancel_orders_indicator(self):
+        cdef:
+            list active_orders = self.market_info_to_active_orders.get(self._market_info, [])
+        active_orders = [order for order in active_orders
+                         if order.client_order_id not in self._hanging_order_ids]
+        for order in active_orders:
+            if order.is_buy and self._sell_signal:
+                negation = -1
+                self.logger().info(f"Sell signal."
+                                   f" Cancelling Order: ({'Buy' if order.is_buy else 'Sell'}) "
+                                   f"ID - {order.client_order_id}")
+                self.c_cancel_order(self._market_info, order.client_order_id)
+            elif order.is_sell and self._buy_signal:
+                negation = 1
+                self.logger().info(f"Buy signal"
+                                   f" Cancelling Order: ({'Buy' if order.is_buy else 'Sell'}) "
+                                   f"ID - {order.client_order_id}")
+                self.c_cancel_order(self._market_info, order.client_order_id)
 
     cdef c_cancel_hanging_orders(self):
         cdef:

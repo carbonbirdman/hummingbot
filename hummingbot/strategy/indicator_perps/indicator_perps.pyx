@@ -1208,22 +1208,22 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
     # Cancel if our indicators say to
     cdef c_cancel_orders_indicator(self):
         cdef:
-            list active_orders = self.market_info_to_active_orders.get(self._market_info, [])
-        active_orders = [order for order in active_orders
-                         if order.client_order_id not in self._hanging_order_ids]
+            list active_orders = self.active_orders
         for order in active_orders:
-            if order.is_buy and self._sell_signal:
-                negation = -1
-                self.logger().info(f"Sell signal."
-                                   f" Cancelling Order: ({'Buy' if order.is_buy else 'Sell'}) "
-                                   f"ID - {order.client_order_id}")
-                self.c_cancel_order(self._market_info, order.client_order_id)
-            elif order.is_sell and self._buy_signal:
-                negation = 1
-                self.logger().info(f"Buy signal"
-                                   f" Cancelling Order: ({'Buy' if order.is_buy else 'Sell'}) "
-                                   f"ID - {order.client_order_id}")
-                self.c_cancel_order(self._market_info, order.client_order_id)
+            if order.is_buy:
+                if self._sell_signal:
+                    negation = -1
+                    self.logger().info(f"Sell signal."
+                                       f" Cancelling Order: ({'Buy' if order.is_buy else 'Sell'}) "
+                                       f"ID - {order.client_order_id}")
+                    self.c_cancel_order(self._market_info, order.client_order_id)
+            else:
+                if self._buy_signal:
+                    negation = 1
+                    self.logger().info(f"Buy signal"
+                                       f" Cancelling Order: ({'Buy' if order.is_buy else 'Sell'}) "
+                                       f"ID - {order.client_order_id}")
+                    self.c_cancel_order(self._market_info, order.client_order_id)
 
     cdef c_cancel_hanging_orders(self):
         cdef:

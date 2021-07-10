@@ -61,6 +61,13 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         object _ts_peak_bid_price
         object _ts_peak_ask_price
         list _exit_orders
+        float _mean1h
+        float _mean10m
+        bint _trend1h
+        bint _trend10m
+        bint _buy_signal
+        bint _sell_signal
+
     cdef c_manage_positions(self, list session_positions)
     cdef c_profit_taking_feature(self, object mode, list active_positions)
     cdef c_trailing_stop_feature(self, object mode, list active_positions)
@@ -84,3 +91,5 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
     cdef bint c_to_create_orders(self, object proposal)
     cdef c_execute_orders_proposal(self, object proposal, object position_action)
     cdef set_timers(self)
+    cdef c_apply_indicator_constraint(self, object proposal)
+    cdef c_cancel_orders_indicator(self)

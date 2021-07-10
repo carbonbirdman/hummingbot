@@ -562,11 +562,11 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
             else:
                 self._buy_signal = False
                 self._sell_signal = True
-        except Exception e:
-            self.logger().warning(f"No data. Hold up.{e}")
+        except Exception:
+            self.logger().warning(f"No data. Hold up.")
             self._buy_signal = False
             self._sell_signal = False
-        #
+
         # timeframe = '5m'
         # nsteps = 20
         # tsi = exchange.fetch_ohlcv(coin, timeframe, limit=nsteps)
@@ -637,6 +637,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                 self.c_cancel_active_orders(proposal)
                 self.c_cancel_hanging_orders()
                 self.c_cancel_orders_below_min_spread()
+                self.c_cancel_orders_indicator()
                 if self.c_to_create_orders(proposal):
                     self._close_order_type = OrderType.LIMIT
                     self.c_execute_orders_proposal(proposal, PositionAction.OPEN)

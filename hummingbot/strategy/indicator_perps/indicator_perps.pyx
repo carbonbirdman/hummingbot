@@ -167,6 +167,10 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         self._trend1h: bool = False
         self._mean10m: float = 0.0
         self._trend10m: bool = False
+        self._buy_signal = False
+        self._sell_signal = False
+        self._close_longs_signal = False
+        self._close_shorts_signal = True
 
         self.c_add_markets([market_info.market])
 
@@ -550,8 +554,8 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         try:
             exchange = ccxt.ftx()
             coin = "BTC/USD"
-            timeframe = '1m'
-            nsteps = 10
+            timeframe = '5m'
+            nsteps = 20
             tsi = exchange.fetch_ohlcv(coin, timeframe, limit=nsteps)
             tspd = pd.DataFrame(tsi, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
             self._mean10m = tspd['close'].mean()
@@ -559,13 +563,19 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
             if self._trend10m:
                 self._buy_signal = True
                 self._sell_signal = False
+                self._close_shorts_signal = True
+                self._close_longs_signal = False
             else:
                 self._buy_signal = False
                 self._sell_signal = True
+                self._close_shorts_signal = False
+                self._close_longs_signal = True
         except Exception:
             self.logger().warning(f"No data. Hold up.")
             self._buy_signal = False
             self._sell_signal = False
+            self._close_shorts_signal = True
+            self._close_longs_signal = True
 
         # timeframe = '5m'
         # nsteps = 20
@@ -667,6 +677,28 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         if proposals is not None:
             self._close_order_type = self._close_position_order_type
             self.c_execute_orders_proposal(proposals, PositionAction.CLOSE)
+
+    cdef c_indicator_close(self, list active_positions):
+        # unfinished and not called - uses normal position management
+        cdef:
+            # list active_orders = self.active_orders
+            # list unwanted_exit_orders = [o for o in active_orders if o.client_order_id not in self._exit_orders]
+            ExchangeBase market = self._market_info.market
+            list buys = []
+            list sells = []
+        for position in active_positions:
+            size = market.c_quantize_order_amount(self.trading_pair, abs(position.amount))
+            if position.amount > 0:
+                if self._close_longs_signal:
+                    self.logger().info(f"Killing buy")
+                    ask_price = market.get_price(self.trading_pair, False)
+                    buys.append(PriceSize(ask_price, size))
+            if position.amount < 0:
+                if self._close_shorts_signal:
+                    self.logger().info(f"Killing sell")
+                    bid_price = market.get_price(self.trading_pair, True)
+                    sells.append(PriceSize(bid_price, size))
+        return Proposal(buys, sells)
 
     cdef c_profit_taking_feature(self, object mode, list active_positions):
         cdef:

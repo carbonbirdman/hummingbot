@@ -67,6 +67,8 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         bint _trend10m
         bint _buy_signal
         bint _sell_signal
+        bint _close_longs_signal
+        bint _close_shorts_signal
 
     cdef c_manage_positions(self, list session_positions)
     cdef c_profit_taking_feature(self, object mode, list active_positions)
@@ -93,3 +95,4 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
     cdef set_timers(self)
     cdef c_apply_indicator_constraint(self, object proposal)
     cdef c_cancel_orders_indicator(self)
+    cdef c_indicator_close(self, list session_positions)

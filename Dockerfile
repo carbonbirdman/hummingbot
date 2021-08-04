@@ -56,14 +56,18 @@ COPY --chown=hummingbot:hummingbot DATA_COLLECTION.md .
 # activate hummingbot env when entering the CT
 RUN echo "source /home/hummingbot/miniconda3/etc/profile.d/conda.sh && conda activate $(head -1 setup/environment-linux.yml | cut -d' ' -f2)" >> ~/.bashrc
 
+RUN /home/hummingbot/miniconda3/envs/hummingbot/bin/python3 setup.py build_ext --inplace -j 8
+RUN rm -rf build/
+RUN find . -type f -name "*.cpp" -delete
+
 # ./compile + cleanup build folder
-RUN /home/hummingbot/miniconda3/envs/$(head -1 setup/environment-linux.yml | cut -d' ' -f2)/bin/python3 setup.py build_ext --inplace -j 8 && \
-    rm -rf build/ && \
-    find . -type f -name "*.cpp" -delete
+#RUN /home/hummingbot/miniconda3/envs/$(head -1 setup/environment-linux.yml | cut -d' ' -f2)/bin/python3 setup.py build_ext --inplace -j 8 && \
+#    rm -rf build/ && \
+#    find . -type f -name "*.cpp" -delete
 
 # Build final image using artifacts from builer
 FROM ubuntu:20.04 AS release
-# Dockerfile author / maintainer 
+# Dockerfile author / maintainer
 LABEL maintainer="CoinAlpha, Inc. <dev@coinalpha.com>"
 
 # Build arguments

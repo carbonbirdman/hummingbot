@@ -554,13 +554,17 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         try:
             exchange = ccxt.ftx()
             coin = "BTC/USD"
-            timeframe = '5m'
-            nsteps = 20
+            timeframe = '1m'
+            nsteps = 60
             tsi = exchange.fetch_ohlcv(coin, timeframe, limit=nsteps)
             tspd = pd.DataFrame(tsi, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
-            self._mean10m = tspd['close'].mean()
+            self._mean10m = tspd['close'].iloc[-10:-1].mean()
             self._trend10m = tspd['close'].iloc[-1] > self._mean10m
-            if self._trend10m:
+            self._mean1h = tspd['close'].iloc[-60:-1].mean()
+            self._trend1h = tspd['close'].iloc[-1] > self._mean11h
+
+        # signals
+            if (self._trend10m & self._trend1h):
                 self._buy_signal = True
                 self._sell_signal = False
                 self._close_shorts_signal = True
@@ -570,6 +574,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                 self._sell_signal = True
                 self._close_shorts_signal = False
                 self._close_longs_signal = True
+
         except Exception:
             self.logger().warning(f"No data. Hold up.")
             self._buy_signal = False
@@ -585,7 +590,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         # self._trend1h = tspd['close'].iloc[-1] > self._mean1h
 
     cdef c_start(self, Clock clock, double timestamp):
-        clock._tick_size = 2
+        clock._tick_size = 10
         StrategyBase.c_start(self, clock, timestamp)
         self._last_timestamp = timestamp
         self.c_apply_initial_settings(self.trading_pair, self._position_mode, self._leverage)
@@ -600,7 +605,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         StrategyBase.c_tick(self, timestamp)
 
         self.update_indicator_signals()
-        # self.logger().info(f"Trend 10m {self._trend10m}. Mean {self._mean10m}. Sell: {self._sell_signal}. Buy: {self._buy_signal}")
+        self.logger().info(f"Trend 10m {self._trend10m}. Mean {self._mean10m}. Sell: {self._sell_signal}. Buy: {self._buy_signal}")
 
         cdef:
             ExchangeBase market = self._market_info.market
@@ -640,6 +645,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                     self.c_apply_order_price_modifiers(proposal)
                     # 4. Apply budget constraint, i.e. can't buy/sell more than what you have.
                     self.c_apply_budget_constraint(proposal)
+            # 5. Apply indicator-based constrant: only long in an uptrend
                     self.c_apply_indicator_constraint(proposal)
 
                     if not self._take_if_crossed:
@@ -647,7 +653,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                 self.c_cancel_active_orders(proposal)
                 self.c_cancel_hanging_orders()
                 self.c_cancel_orders_below_min_spread()
-                self.c_cancel_orders_indicator()
+                # self.c_cancel_orders_indicator()
                 if self.c_to_create_orders(proposal):
                     self._close_order_type = OrderType.LIMIT
                     self.c_execute_orders_proposal(proposal, PositionAction.OPEN)
@@ -679,7 +685,6 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
             self.c_execute_orders_proposal(proposals, PositionAction.CLOSE)
 
     cdef c_indicator_close(self, list active_positions):
-        # unfinished and not called - uses normal position management
         cdef:
             # list active_orders = self.active_orders
             # list unwanted_exit_orders = [o for o in active_orders if o.client_order_id not in self._exit_orders]
@@ -1238,6 +1243,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
             self.set_timers()
 
     # Cancel if our indicators say to
+    # not currently called
     cdef c_cancel_orders_indicator(self):
         cdef:
             list active_orders = self.active_orders

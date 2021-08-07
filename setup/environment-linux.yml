@@ -1,6 +1,5 @@
 name: hummingbot
 channels:
-  - conda-forge
   - conda-canary
   - defaults
 dependencies:

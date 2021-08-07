@@ -8,6 +8,13 @@ RUN apt-get update && \
         sudo && \
     rm -rf /var/lib/apt/lists/*
 
+#RUN sudo fallocate -l 1G /swapfile && \
+#sudo chmod 600 /swapfile && \
+#sudo mkswap /swapfile && \
+#sudo swapon /swapfile && \
+#sudo cp /etc/fstab /etc/fstab.bak && \
+#echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
 # Add hummingbot user
 RUN useradd -m -s /bin/bash hummingbot
 
@@ -40,10 +47,13 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | b
 COPY --chown=hummingbot:hummingbot setup/environment-linux.yml setup/
 
 # ./install | create hummingbot environment
-RUN ~/miniconda3/bin/conda env create -f setup/environment-linux.yml && \
-    ~/miniconda3/bin/conda clean -tipsy && \
+RUN echo ". ~/miniconda3/etc/profile.d/conda.sh" >> ~/.profile
+SHELL [ "/bin/bash", "--login", "-c" ]
+RUN ~/miniconda3/bin/conda init bash 
+RUN ~/miniconda3/bin/conda env create -f setup/environment-linux.yml --name hummingbot
+RUN ~/miniconda3/bin/conda clean -tipsy --yes
     # clear pip cache
-    rm -rf /home/hummingbot/.cache
+#RUN rm -rf /home/hummingbot/.cache
 
 # Copy remaining files
 COPY --chown=hummingbot:hummingbot bin/ bin/

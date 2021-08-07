@@ -4,16 +4,24 @@
 echo
 echo
 echo "===============  CREATE A NEW HUMMINGBOT INSTANCE ==============="
-echo
+echo "                 CUSTOM CONTAINER                                "
 echo
 echo "ℹ️  Press [ENTER] for default values:"
 echo
 
+# Specify hummingbot base image
+read -p "   Enter Hummingbot build you want to use [carbonbot] (default = \"carbonbot\") >>> " IMAGE 
+if [ "$IMAGE" == "" ]
+then
+  IMAGE="carbonbot"
+fi
+
+
 # Specify hummingbot version
-read -p "   Enter Hummingbot version you want to use [latest/development] (default = \"latest\") >>> " TAG
+read -p "   Enter Hummingbot version you want to use [latest/development] (default = \"dev\") >>> " TAG
 if [ "$TAG" == "" ]
 then
-  TAG="latest"
+  TAG="dev"
 fi
 
 # Ask the user for the name of the new instance
@@ -36,7 +44,7 @@ echo
 echo "ℹ️  Confirm below if the instance and its folders are correct:"
 echo
 printf "%30s %5s\n" "Instance name:" "$INSTANCE_NAME"
-printf "%30s %5s\n" "Version:" "coinalpha/hummingbot:$TAG"
+printf "%30s %5s\n" "Version:" "$IMAGE:$TAG"
 echo
 printf "%30s %5s\n" "Main folder path:" "$PWD/$FOLDER"
 printf "%30s %5s\n" "Config files:" "├── $FOLDER/hummingbot_conf"
@@ -78,7 +86,7 @@ create_instance () {
  --mount "type=bind,source=$(pwd)/$FOLDER/hummingbot_data,destination=/data/" \
  --mount "type=bind,source=$(pwd)/$FOLDER/hummingbot_scripts,destination=/scripts/" \
  --mount "type=bind,source=$(pwd)/$FOLDER/hummingbot_certs,destination=/certs/" \
- coinalpha/hummingbot:$TAG
+ $IMAGE:$TAG
 }
 
 prompt_proceed

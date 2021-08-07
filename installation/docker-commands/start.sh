@@ -1,6 +1,7 @@
 #!/bin/bash
 # init
-# =============================================
+# =============================================================
+# A version customised to use a custom docker container and tag
 # SCRIPT COMMANDS
 echo
 echo "===============  START HUMMINGBOT INSTANCE ==============="

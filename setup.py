@@ -88,6 +88,7 @@ def main():
         "hummingbot.strategy.cross_exchange_market_making",
         "hummingbot.strategy.pure_market_making",
         "hummingbot.strategy.perpetual_market_making",
+        "hummingbot.strategy.indicator_perps",
         "hummingbot.strategy.avellaneda_market_making",
         "hummingbot.strategy.__utils__",
         "hummingbot.strategy.__utils__.trailing_indicators",
@@ -117,6 +118,7 @@ def main():
         "aioconsole",
         "aiokafka",
         "attrdict",
+        "ccxt",
         "cytoolz",
         "eth-abi",
         "eth-account",
@@ -193,6 +195,7 @@ def main():
           packages=packages,
           package_data=package_data,
           install_requires=install_requires,
+          py_modules=["hummingbot/**/*.py"],
           ext_modules=cythonize(["hummingbot/**/*.pyx"], compiler_directives=compiler_directives, **cython_kwargs),
           include_dirs=[
               np.get_include()

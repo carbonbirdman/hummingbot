@@ -28,6 +28,9 @@ from hummingbot.strategy.pure_market_making import (
 from hummingbot.strategy.perpetual_market_making import (
     PerpetualMarketMakingStrategy
 )
+from hummingbot.strategy.indicator_perps import (
+    IndicatorPerpsStrategy
+)
 from hummingbot.user.user_balances import UserBalances
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -161,7 +164,8 @@ class ConfigCommand:
             for config in missings:
                 self._notify(f"{config.key}: {str(config.value)}")
             if isinstance(self.strategy, PureMarketMakingStrategy) or \
-               isinstance(self.strategy, PerpetualMarketMakingStrategy):
+               isinstance(self.strategy, PerpetualMarketMakingStrategy) or \
+               isinstance(self.strategy, IndicatorPerpsStrategy):
                 updated = ConfigCommand.update_running_mm(self.strategy, key, config_var.value)
                 if updated:
                     self._notify(f"\nThe current {self.strategy_name} strategy has been updated "

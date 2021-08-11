@@ -37,7 +37,7 @@ from .data_types import (
     Proposal,
     PriceSize
 )
-from hummingbot.strategy.perpetual_market_making.perpetual_market_making_order_tracker import PerpetualMarketMakingOrderTracker
+from .indicator_perps_order_tracker import IndicatorPerpsOrderTracker
 
 from hummingbot.strategy.asset_price_delegate cimport AssetPriceDelegate
 from hummingbot.strategy.asset_price_delegate import AssetPriceDelegate
@@ -109,7 +109,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         if price_ceiling != s_decimal_neg_one and price_ceiling < price_floor:
             raise ValueError("Parameter price_ceiling cannot be lower than price_floor.")
 
-        self._sb_order_tracker = PerpetualMarketMakingOrderTracker()
+        self._sb_order_tracker = IndicatorPerpsOrderTracker()
         self._market_info = market_info
         self._leverage = leverage
         self._position_mode = PositionMode.HEDGE if position_mode == "Hedge" else PositionMode.ONEWAY
@@ -565,11 +565,16 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                 self._sell_signal = False
                 self._close_shorts_signal = True
                 self._close_longs_signal = False
-            else:
+            elif (~self._trend10m & ~self._trend1h):
                 self._buy_signal = False
                 self._sell_signal = True
                 self._close_shorts_signal = False
                 self._close_longs_signal = True
+            else:
+                self._buy_signal = False
+                self._sell_signal = False
+                self._close_shorts_signal = False
+                self._close_longs_signal = False
 
         except Exception:
             self.logger().warning(f"No data. Hold up.")
@@ -586,6 +591,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         # self._trend1h = tspd['close'].iloc[-1] > self._mean1h
 
     cdef c_start(self, Clock clock, double timestamp):
+        clock._tick_size = 10
         StrategyBase.c_start(self, clock, timestamp)
         self._last_timestamp = timestamp
         self.c_apply_initial_settings(self.trading_pair, self._position_mode, self._leverage)
@@ -599,7 +605,9 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
     cdef c_tick(self, double timestamp):
         StrategyBase.c_tick(self, timestamp)
         self.update_indicator_signals()
-        self.logger().info(f"Trend 10m {self._trend10m}. Mean {self._mean10m}. Sell: {self._sell_signal}. Buy: {self._buy_signal}")
+        self.logger().info(f"Mean 10m, 1h = {self._mean10m}, {self._mean1h}")
+        self.logger().info(f"Trend 10m, 1h = {self._trend10m}, {self._trend1h}")
+        self.logger().info(f"Signals: Sell: {self._sell_signal}. Buy: {self._buy_signal}")
 
         cdef:
             ExchangeBase market = self._market_info.market
@@ -662,6 +670,14 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         cdef:
             object mode = self._position_mode
 
+        # any zero positions, get rid of
+        if len(self.active_positions) > 0:
+            df = self.active_positions_df()
+            self.logger().info(df.to_string())
+        if len(session_positions) > 0:
+            for position in session_positions:
+                self.logger().info("{}".format(str(position.amount)))
+
         if self._position_management == "Profit_taking":
             self._close_order_type = OrderType.LIMIT
             proposals = self.c_profit_taking_feature(mode, session_positions)
@@ -676,6 +692,20 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         if proposals is not None:
             self._close_order_type = self._close_position_order_type
             self.c_execute_orders_proposal(proposals, PositionAction.CLOSE)
+
+        if len(self.active_positions) == 1:
+            self.logger().info("remove position?")
+            #  position == session_positions[0]
+            # if position.amount == 0:
+            # self.logger().info("remove position")
+            # try:
+            #     self._market_info.market.account_positions = []
+            # except Exception as e:
+            #    self.logger().info("{}".format(str(e)))
+            # try:
+            #    self.active_positions = []
+            # except Exception as e:
+            #    self.logger().info("{}".format(str(e)))
 
     cdef c_indicator_close(self, list active_positions):
         cdef:
@@ -737,7 +767,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                 exit_order_exists = [o for o in active_orders if o.price == price]
                 if len(exit_order_exists) == 0:
                     size = market.c_quantize_order_amount(self.trading_pair, abs(position.amount))
-                    if size > 0 and price > 0:
+                    if size >= 0 and price >= 0:
                         if position.amount < 0:
                             buys.append(PriceSize(price, size))
                         else:
@@ -935,6 +965,18 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         if self._price_floor > 0 and self.get_price() <= self._price_floor:
             proposal.sells = []
 
+    cdef c_apply_indicator_constraint(self, proposal):
+        """ Only longs in an uptrend
+            Only shorts in a downtrend
+        """
+        self.update_indicator_signals()
+        if ~self._sell_signal:
+            self.logger().info(f"No sell signal..")
+            proposal.sells = []
+        elif ~self._buy_signal:
+            self.logger().info(f"No buy signal.")
+            proposal.buys = []
+
     cdef c_apply_ping_pong(self, object proposal):
         self._ping_pong_warning_lines = []
         if self._filled_buys_balance == self._filled_sells_balance:
@@ -1050,19 +1092,6 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
             # increase your price to this
             higher_sell_price = max(proposal.sells[0].price, price_below_ask)
             proposal.sells[0].price = market.c_quantize_order_price(self.trading_pair, higher_sell_price)
-
-    cdef c_apply_indicator_constraint(self, object proposal):
-        """ Only longs in an uptrend
-            Only shorts in a downtrend
-        """
-        self.update_indicator_signals()
-        # self._trend1h: bool = False
-        if self._buy_signal:
-            self.logger().info(f"Buy signal. No selling.")
-            proposal.sells = []
-        elif self._sell_signal:
-            self.logger().info(f"Sell signal. No buying.")
-            proposal.buys = []
 
     cdef object c_apply_add_transaction_costs(self, object proposal):
         cdef:

@@ -43,7 +43,7 @@ from hummingbot.strategy.asset_price_delegate cimport AssetPriceDelegate
 from hummingbot.strategy.asset_price_delegate import AssetPriceDelegate
 from hummingbot.strategy.order_book_asset_price_delegate cimport OrderBookAssetPriceDelegate
 from hummingbot.core.utils import map_df_to_str
-
+import asyncio
 
 NaN = float("nan")
 s_decimal_zero = Decimal(0)
@@ -602,6 +602,9 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         market.set_leverage(trading_pair, leverage)
         market.set_position_mode(position)
 
+    async def update_market_positions(self):
+        await self.market._update_positions()
+
     cdef c_tick(self, double timestamp):
         StrategyBase.c_tick(self, timestamp)
         self.update_indicator_signals()
@@ -611,7 +614,8 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
 
         cdef:
             ExchangeBase market = self._market_info.market
-            list session_positions = [s for s in self.active_positions.values() if s.trading_pair == self.trading_pair]
+            # ignore size zero positions
+            list session_positions = [s for s in self.active_positions.values() if ((s.trading_pair == self.trading_pair) & (s.amount > 0))]
             int64_t current_tick = <int64_t>(timestamp // self._status_report_interval)
             int64_t last_tick = <int64_t>(self._last_timestamp // self._status_report_interval)
             bint should_report_warnings = ((current_tick > last_tick) and
@@ -627,7 +631,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                     if should_report_warnings:
                         self.logger().warning(f"Markets are not ready. No market making trades are permitted.")
                     return
-
+            # self.update_market_positions()
             if should_report_warnings:
                 if not all([market.network_status is NetworkStatus.CONNECTED for market in self._sb_markets]):
                     self.logger().warning(f"WARNING: Some markets are not connected or are down at the moment. Market "
@@ -671,12 +675,14 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
             object mode = self._position_mode
 
         # any zero positions, get rid of
-        if len(self.active_positions) > 0:
-            df = self.active_positions_df()
-            self.logger().info(df.to_string())
-        if len(session_positions) > 0:
-            for position in session_positions:
-                self.logger().info("{}".format(str(position.amount)))
+        # if len(self.active_positions) > 0:
+        #    df = self.active_positions_df()
+        #    self.logger().info(df.to_string())
+        # if len(session_positions) > 0:
+        #    for position in session_positions:
+        #        self.logger().info("{}".format(str(position.amount)))
+        #    for position in self._market_info.market.account_positions:
+        #        self.logger().info("{}".format(str(position.amount)))
 
         if self._position_management == "Profit_taking":
             self._close_order_type = OrderType.LIMIT
@@ -694,7 +700,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
             self.c_execute_orders_proposal(proposals, PositionAction.CLOSE)
 
         if len(self.active_positions) == 1:
-            self.logger().info("remove position?")
+            self.logger().info("One active position")
             #  position == session_positions[0]
             # if position.amount == 0:
             # self.logger().info("remove position")

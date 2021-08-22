@@ -559,18 +559,21 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
             self._mean1h = tspd['close'].iloc[-60:-1].mean()
             self._trend1h = tspd['close'].iloc[-1] > self._mean11h
 
-        # signals
+            # signals
             if (self._trend10m & self._trend1h):
+                self.logger().warning(f"Trending 10 minutes and 1 hour")
                 self._buy_signal = True
                 self._sell_signal = False
                 self._close_shorts_signal = True
                 self._close_longs_signal = False
-            elif (~self._trend10m & ~self._trend1h):
+            elif ((not self._trend10m) & (not self._trend1h)):
+                self.logger().warning(f"Negative trend 10 minutes and 1 hour")
                 self._buy_signal = False
                 self._sell_signal = True
                 self._close_shorts_signal = False
                 self._close_longs_signal = True
             else:
+                self.logger().warning(f"Inconsistent signals")
                 self._buy_signal = False
                 self._sell_signal = False
                 self._close_shorts_signal = False
@@ -591,7 +594,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         # self._trend1h = tspd['close'].iloc[-1] > self._mean1h
 
     cdef c_start(self, Clock clock, double timestamp):
-        clock._tick_size = 10
+        clock._tick_size = 6
         StrategyBase.c_start(self, clock, timestamp)
         self._last_timestamp = timestamp
         self.c_apply_initial_settings(self.trading_pair, self._position_mode, self._leverage)
@@ -644,7 +647,7 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
                 # asset_mid_price = self.c_set_mid_price(market_info)
                 if self._create_timestamp <= self._current_timestamp:
                     # 1. Create base order proposals
-                    proposal =self.c_create_base_proposal()
+                    proposal = self.c_create_base_proposal()
                     # 2. Apply functions that limit numbers of buys and sells proposal
                     self.c_apply_order_levels_modifiers(proposal)
                     # 3. Apply functions that modify orders price
@@ -971,17 +974,20 @@ cdef class IndicatorPerpsStrategy(StrategyBase):
         if self._price_floor > 0 and self.get_price() <= self._price_floor:
             proposal.sells = []
 
-    cdef c_apply_indicator_constraint(self, proposal):
+    cdef c_apply_indicator_constraint(self, object proposal):
         """ Only longs in an uptrend
             Only shorts in a downtrend
         """
         self.update_indicator_signals()
-        if ~self._sell_signal:
+        if self._sell_signal:
             self.logger().info(f"No sell signal..")
-            proposal.sells = []
-        elif ~self._buy_signal:
-            self.logger().info(f"No buy signal.")
             proposal.buys = []
+        elif self._buy_signal:
+            self.logger().info(f"No buy signal.")
+            proposal.sells = []
+        else:
+            proposal.buys = []
+            proposal.sells = []
 
     cdef c_apply_ping_pong(self, object proposal):
         self._ping_pong_warning_lines = []
